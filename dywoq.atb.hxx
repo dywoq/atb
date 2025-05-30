@@ -1,6 +1,13 @@
 #ifndef DYWOQATB_HXX
 #define DYWOQATB_HXX
 
+#include <exception>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+
 #ifdef __dywoqatb
 #  define DYWOQATB_VERSION __dywoqatb
 #else
@@ -50,13 +57,43 @@
 #  endif
 #endif
 
+#if !DYWOQATB_HAS_EXCEPTIONS
+#  define DYWOQATB_NOEXCEPT noexcept
+#else
+#  define DYWOQATB_NOEXCEPT
+#endif
+
 #define DYWOQATB_BEGIN_NAMESPACE namespace dywoq::atb {
 #define DYWOQATB_END_NAMESPACE }
 
 #if DYWOQATB_HAS_BASE_SUPPORT
 DYWOQATB_BEGIN_NAMESPACE
+namespace __internal {
 
+// AN IMPORTANT NOTE
+//
+// if exceptions are disabled, the function uses std::terminate to terminate the
+// program. however, local smart pointers variables are not freed automatically.
+// you need to use reset() function from smart pointers before terminating,
+// as it will cause no memory leaks.
+template <typename _Err>
+  requires std::is_base_of_v<_Err, std::exception>
+void __throw_exception(const char *__msg) DYWOQATB_NOEXCEPT {
+#  if DYWOQATB_HAS_EXCEPTIONS
+  throw _Err(__msg);
+#  else
+  std::cout << "[dywoq::atb::__internal] the exception was thrown in "
+               "-fno-exceptions (/EHsc- for msvc) mode with message \""
+            << __msg << "\"";
+  std::terminate();
+#  endif
+}
 
+} // namespace __internal
+
+struct test_error : public std::logic_error {
+  using std::logic_error::logic_error;
+};
 
 DYWOQATB_END_NAMESPACE
 #endif
