@@ -1,2 +1,2 @@
-BasedOnStyle: LLVM
-IndentWidth: 2
+CompileFlags:
+  Add: [--std=c++20, -D__dywoqatb=202505LL]
