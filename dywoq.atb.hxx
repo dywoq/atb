@@ -1,11 +1,10 @@
 #ifndef DYWOQATB_HXX
 #define DYWOQATB_HXX
 
+#include <concepts>
 #include <exception>
-#include <iostream>
-#include <memory>
+#include <optional>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 
 #ifdef __dywoqatb
@@ -21,8 +20,7 @@
 #    define DYWOQATB_HAS_CXX20_SUPPORT 0
 #  endif
 #else
-#  error                                                                       \
-      "[dywoq.atb.hxx] critical error: the code must be compiled by C++ compiler"
+#  error "[dywoq.atb.hxx] critical error: the code must be compiled by C++ compiler"
 #endif
 
 #if DYWOQATB_HAS_CXX20_SUPPORT && DYWOQATB_VERSION >= 202505LL
@@ -47,11 +45,11 @@
 #  endif
 #else
 #  if defined(__clang__) || defined(__GNUC__)
-#    warning                                                                   \
+#    warning                                                                                                           \
         "[dywoq.atb.hxx] warning: there's no macro for tracking exceptions' status; the value of DYWOQATB_HAS_EXCEPTIONS will be always 1 "
 #    define DYWOQATB_HAS_EXCEPTIONS 1
 #  elif defined(_MSC_VER)
-#    pragma message(                                                           \
+#    pragma message(                                                                                                   \
         "[dywoq.atb.hxx] warning: there's no macro for tracking exceptions' status; the value of DYWOQATB_HAS_EXCEPTIONS will be always 1 ")
 #    define DYWOQATB_HAS_EXCEPTIONS 1
 #  endif
@@ -61,6 +59,25 @@
 #  define DYWOQATB_NOEXCEPT noexcept
 #else
 #  define DYWOQATB_NOEXCEPT
+#endif
+
+#if DYWOQATB_HAS_EXCEPTIONS
+#  define DYWOQATB_TRY_CATCH_BLOCK_START try {
+#else
+#  define DYWOQATB_TRY_CATCH_BLOCK_START
+#endif
+
+#if DYWOQATB_HAS_EXCEPTIONS
+#  define DYWOQATB_TRY_CATCH_BLOCK_END(exception_to_catch, exception_to_throw)                                         \
+    }                                                                                                                  \
+    catch (const exception_to_catch &__e) {                                                                            \
+      throw exception_to_throw(__e.what());                                                                            \
+    }                                                                                                                  \
+    catch (...) {                                                                                                      \
+      throw exception_to_throw("an unknown error");                                                                    \
+    }
+#else
+#  define DYWOQATB_TRY_CATCH_BLOCK_END(exceptions_to_catch, exceptions_to_throw)
 #endif
 
 #define DYWOQATB_BEGIN_NAMESPACE namespace dywoq::atb {
@@ -93,6 +110,43 @@ void __throw_exception(const char *__msg) DYWOQATB_NOEXCEPT {
 
 struct test_error : public std::logic_error {
   using std::logic_error::logic_error;
+};
+
+template <typename _Tp>
+  requires std::equality_comparable<_Tp>
+struct test {
+private:
+  std::optional<const char *> __name_;
+  std::optional<_Tp> __got_;
+  std::optional<_Tp> __expected_;
+
+public:
+  explicit test(std::optional<const char *> __name, std::optional<_Tp> __got, std::optional<_Tp> __expected) noexcept
+      : __name_(std::move(__name)), __got_(std::move(__got)), __expected_(std::move(__expected)) {}
+
+  const char *name() const DYWOQATB_NOEXCEPT {
+    DYWOQATB_TRY_CATCH_BLOCK_START
+    return __name_.value();
+    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
+  }
+
+  const _Tp &got() const DYWOQATB_NOEXCEPT {
+    DYWOQATB_TRY_CATCH_BLOCK_START
+    return __got_.value();
+    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
+  }
+
+  const _Tp &expected() const DYWOQATB_NOEXCEPT {
+    DYWOQATB_TRY_CATCH_BLOCK_START
+    return __expected_.value();
+    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
+  }
+
+  operator bool() const DYWOQATB_NOEXCEPT {
+    DYWOQATB_TRY_CATCH_BLOCK_START
+    return __got_.value() == __expected_.value();
+    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
+  }
 };
 
 DYWOQATB_END_NAMESPACE
