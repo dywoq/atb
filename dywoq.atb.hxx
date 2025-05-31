@@ -3,9 +3,9 @@
 
 #include <concepts>
 #include <exception>
+#include <format>
 #include <optional>
 #include <stdexcept>
-#include <type_traits>
 
 #ifdef __dywoqatb
 #  define DYWOQATB_VERSION __dywoqatb
@@ -94,7 +94,7 @@ namespace __internal {
 // you need to use reset() function from smart pointers before terminating,
 // as it will cause no memory leaks.
 template <typename _Err>
-  requires std::is_base_of_v<_Err, std::exception>
+  requires std::derived_from<_Err, std::exception>
 void __throw_exception(const char *__msg) DYWOQATB_NOEXCEPT {
 #  if DYWOQATB_HAS_EXCEPTIONS
   throw _Err(__msg);
@@ -117,11 +117,11 @@ template <typename _Tp>
 struct test {
 private:
   std::optional<const char *> __name_;
-  std::optional<_Tp> __got_;
-  std::optional<_Tp> __expected_;
+  _Tp __got_;
+  _Tp __expected_;
 
 public:
-  explicit test(std::optional<const char *> __name, std::optional<_Tp> __got, std::optional<_Tp> __expected) noexcept
+  explicit test(std::optional<const char *> __name, _Tp __got, _Tp __expected) noexcept
       : __name_(std::move(__name)), __got_(std::move(__got)), __expected_(std::move(__expected)) {}
 
   const char *name() const DYWOQATB_NOEXCEPT {
@@ -130,22 +130,32 @@ public:
     DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
   }
 
-  const _Tp &got() const DYWOQATB_NOEXCEPT {
-    DYWOQATB_TRY_CATCH_BLOCK_START
-    return __got_.value();
-    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
+  const _Tp &got() const noexcept { return __got_; }
+
+  const _Tp &expected() const noexcept { return __expected_; }
+
+  operator bool() const noexcept { return __got_ == __expected_; }
+};
+
+struct test_runner {
+  template <typename _Tp>
+    requires std::equality_comparable<_Tp>
+  static void run(const test<_Tp> &__test) DYWOQATB_NOEXCEPT {
+    if (__test.got() != __test.expected()) {
+      const char *__fmt_name = std::string(__test.name()).empty() ? "unknown" : __test.name();
+      std::string __fmt_msg = std::format("[dywoq.atb.hxx] test with name \"{}\" failed; got {}, expected: {}",
+                                          __fmt_name, __test.got(), __test.expected());
+      test_error __err(__fmt_msg.c_str());
+      __internal::__throw_exception<test_error>(__err.what());
+    }
   }
 
-  const _Tp &expected() const DYWOQATB_NOEXCEPT {
-    DYWOQATB_TRY_CATCH_BLOCK_START
-    return __expected_.value();
-    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
-  }
-
-  operator bool() const DYWOQATB_NOEXCEPT {
-    DYWOQATB_TRY_CATCH_BLOCK_START
-    return __got_.value() == __expected_.value();
-    DYWOQATB_TRY_CATCH_BLOCK_END(std::bad_optional_access, test_error)
+  template <typename _Tp>
+    requires std::equality_comparable<_Tp>
+  static void run(const std::optional<const char *> &__name, const _Tp &__got,
+                  const _Tp &__expected) DYWOQATB_NOEXCEPT {
+    test<_Tp> __test(__name, __got, __expected);
+    run(__test);
   }
 };
 
